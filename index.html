@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>Chess Online - No Refresh</title>
+
+<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+
+<style>
+/* 🔥 ENG MUHIM QISMI: Brauzerning pastga tortganda yangilanishini butunlay o'chiramiz */
+html, body {
+    overscroll-behavior-y: contain;
+    overscroll-behavior-x: contain;
+    overflow: hidden; /* Ekran ortiqcha qimirlamasligi uchun */
+    position: fixed;
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    background: #1b1b1b;
+    color: white;
+    text-align: center;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+#board {
+    width: 350px;
+    margin: 15px auto;
+    /* Donalarni surganda ko'k rangli matn belgilash chiqib ketmasligi uchun */
+    -webkit-user-select: none;
+    user-select: none;
+}
+#status {
+    font-size: 16px;
+    margin-top: 10px;
+    background: #2a2a2a;
+    padding: 10px;
+    display: inline-block;
+    border-radius: 5px;
+}
+.controls {
+    margin: 15px auto;
+    background: #2d2d2d;
+    padding: 12px;
+    border-radius: 8px;
+    display: inline-block;
+    max-width: 90%;
+}
+input {
+    padding: 8px;
+    border-radius: 4px;
+    border: none;
+    width: 150px;
+    text-align: center;
+    font-size: 16px;
+}
+button {
+    padding: 8px 15px;
+    background: #2ed573;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 16px;
+}
+#myIdDisplay {
+    font-size: 15px;
+    color: #a4b0be;
+    margin-bottom: 8px;
+}
+#my-id {
+    font-size: 20px;
+    letter-spacing: 2px;
+}
+h2 {
+    margin-top: 15px;
+    margin-bottom: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>♟ Chess Online (6-Xonali ID)</h2>
+
+<div class="controls">
+    <div id="myIdDisplay">Sizning ID kodingiz: <b style="color:#eccc68;" id="my-id">Generatsiya...</b></div>
+    <input type="number" id="peerIdInput" placeholder="6 xonali ID kiriting" oninput="if(this.value.length > 6) this.value = this.value.slice(0,6);">
+    <button id="connectBtn" onclick="connectToPeer()">Ulanish</button>
+</div>
+
+<br>
+<div id="status">Tarmoqqa ulanish kutilmoqda...</div>
+<div id="board"></div>
+
+<script>
+var board = null;
+var game = new Chess();
+var myColor = 'w'; 
+var conn = null;
+
+// 🔥 Telefon ekranida donani pastga tortganda sahifa yangilanib ketishini JS orqali ham bloklash
+document.addEventListener('touchmove', function(e) {
+    if (e.target.closest('#board')) {
+        e.preventDefault();
+    }
+}, { passive: false });
+
+var random6DigitId = Math.floor(100000 + Math.random() * 900000).toString();
+var peer = new Peer(random6DigitId); 
+
+peer.on('open', function(id) {
+    document.getElementById('my-id').innerText = id;
+    document.getElementById('status').innerText = "O'yin tayyor. Raqibga 6 xonali ID kodni yuboring.";
+});
+
+peer.on('connection', function(connection) {
+    conn = connection;
+    myColor = 'w';
+    setupChatReceiver();
+    document.getElementById('status').innerText = "Raqib ulandi! Siz OQ donsiz. O'yinni boshlang.";
+    board.orientation('white');
+});
+
+function connectToPeer() {
+    var peerId = document.getElementById('peerIdInput').value;
+    if (peerId.length !== 6) {
+        alert("Iltimos, to'g'ri 6 xonali ID kod kiriting!");
+        return;
+    }
+    document.getElementById('status').innerText = "Raqibga ulanmoqda...";
+    conn = peer.connect(peerId);myColor = 'b';
+    
+    conn.on('open', function() {
+        document.getElementById('status').innerText = "Muvaffaqiyatli ulandi! Siz QORA donsiz. Raqib yurishini kuting.";
+        board.orientation('black');
+        setupChatReceiver();
+    });
+    
+    conn.on('error', function(err) {
+        document.getElementById('status').innerText = "Ulanishda xatolik! ID to'g'riligini tekshiring.";
+    });
+}
+
+function setupChatReceiver() {
+    conn.on('data', function(data) {
+        if (data.fen) {
+            game.load(data.fen);
+            board.position(data.fen);
+            updateStatus();
+        }
+    });
+}
+
+function customPieces(piece) {
+    var pieceUrls = {
+        'wK': 'https://upload.wikimedia.org/wikipedia/commons/4/42/Chess_klt45.svg',
+        'wQ': 'https://upload.wikimedia.org/wikipedia/commons/1/15/Chess_qlt45.svg',
+        'wB': 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Chess_blt45.svg',
+        'wN': 'https://upload.wikimedia.org/wikipedia/commons/7/70/Chess_nlt45.svg',
+        'wR': 'https://upload.wikimedia.org/wikipedia/commons/7/72/Chess_rlt45.svg',
+        'wP': 'https://upload.wikimedia.org/wikipedia/commons/4/45/Chess_plt45.svg',
+        'bK': 'https://upload.wikimedia.org/wikipedia/commons/f/f0/Chess_kdt45.svg',
+        'bQ': 'https://upload.wikimedia.org/wikipedia/commons/4/47/Chess_qdt45.svg',
+        'bB': 'https://upload.wikimedia.org/wikipedia/commons/9/98/Chess_bdt45.svg',
+        'bN': 'https://upload.wikimedia.org/wikipedia/commons/e/ef/Chess_ndt45.svg',
+        'bR': 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Chess_rdt45.svg',
+        'bP': 'https://upload.wikimedia.org/wikipedia/commons/c/c7/Chess_pdt45.svg'
+    };
+    return pieceUrls[piece];
+}
+
+function onDragStart(source, piece) {
+    if (game.game_over()) return false;
+    if (piece.charAt(0) !== myColor || game.turn() !== myColor) return false;
+}
+
+function onDrop(source, target) {
+    var move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q'
+    });
+
+    if (move === null) return 'snapback';
+
+    updateStatus();
+
+    if (conn && conn.open) {
+        conn.send({ fen: game.fen() });
+    }
+}
+
+function onSnapEnd() {
+    board.position(game.fen());
+}
+
+function updateStatus() {
+    if (game.game_over()) {
+        if (game.in_checkmate()) document.getElementById('status').innerText = "Mot! O'yin tugadi.";
+        else document.getElementById('status').innerText = "Durang!";
+    } else {
+        var turn = game.turn() === myColor ? "Sizning yurishingiz" : "Raqib yurishi kutilmoqda...";
+        document.getElementById('status').innerText = turn;
+    }
+}
+
+board = Chessboard('board', {
+    draggable: true,
+    position: 'start',
+    onDragStart: onDragStart,
+    onDrop: onDrop,
+    onSnapEnd: onSnapEnd,
+    pieceTheme: customPieces
+});
+
+</script>
+</body>
+</html>
